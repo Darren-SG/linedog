@@ -1,3 +1,4 @@
+
 import { 
   Heart, 
   Utensils, 
@@ -8,7 +9,15 @@ import {
   X,
   Play,
   Pause,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Music,
+  Sliders,
+  Sparkles,
+  Volume2,
+  VolumeX,
+  Plus,
+  Minus
 } from 'lucide-react';
 
 export { 
@@ -21,5 +30,13 @@ export {
   X,
   Play,
   Pause,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Music,
+  Sliders,
+  Sparkles,
+  Volume2,
+  VolumeX,
+  Plus,
+  Minus
 };

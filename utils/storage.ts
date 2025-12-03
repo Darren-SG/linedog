@@ -1,6 +1,9 @@
+
 import { GameState, CONSTANTS } from '../types';
 
 const STORAGE_KEY = 'line-puppy-data';
+const DB_NAME = 'LinePuppyDB';
+const AUDIO_STORE = 'audio';
 
 export const INITIAL_STATE: GameState = {
   pet: {
@@ -12,6 +15,10 @@ export const INITIAL_STATE: GameState = {
     isDead: false,
   },
   snacks: 2, // Start with a couple of free snacks
+  settings: {
+    hungerRateMultiplier: 1.0,
+    feedingPowerMultiplier: 1.0,
+  }
 };
 
 export const saveGame = (state: GameState) => {
@@ -26,7 +33,18 @@ export const saveGame = (state: GameState) => {
 export const loadGame = (): GameState => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : INITIAL_STATE;
+    if (data) {
+      const state = JSON.parse(data);
+      // Migration: Ensure settings exist for old saves
+      if (!state.settings) {
+        state.settings = {
+          hungerRateMultiplier: 1.0,
+          feedingPowerMultiplier: 1.0,
+        };
+      }
+      return state;
+    }
+    return INITIAL_STATE;
   } catch (e) {
     console.error("Failed to load game state:", e);
     return INITIAL_STATE;
@@ -69,5 +87,42 @@ export const compressImage = (file: File): Promise<string> => {
       img.onerror = (err) => reject(err);
     };
     reader.onerror = (err) => reject(err);
+  });
+};
+
+// IndexedDB Logic for Large Audio Files
+const initAudioDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) {
+        db.createObjectStore(AUDIO_STORE);
+      }
+    };
+  });
+};
+
+export const saveAudioFile = async (file: Blob): Promise<void> => {
+  const db = await initAudioDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    const store = tx.objectStore(AUDIO_STORE);
+    store.put(file, 'bgm');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+export const getAudioFile = async (): Promise<Blob | undefined> => {
+  const db = await initAudioDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readonly');
+    const store = tx.objectStore(AUDIO_STORE);
+    const request = store.get('bgm');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
 };

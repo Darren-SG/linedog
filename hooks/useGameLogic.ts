@@ -1,6 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, CONSTANTS } from '../types';
+
+import { useState, useEffect, useCallback } from 'react';
+import { GameState, CONSTANTS, GameSettings } from '../types';
 import { loadGame, saveGame } from '../utils/storage';
+
+const CUTE_MESSAGES = [
+  "You're the best!",
+  "Hehe, that tickles!",
+  "I'm so happy!",
+  "*Happy wiggles*",
+  "I love you!",
+  "Yip yip!",
+  "Can I have a snack?",
+  "*Wagging tail*"
+];
 
 export const useGameLogic = () => {
   const [gameState, setGameState] = useState<GameState>(loadGame);
@@ -20,14 +32,16 @@ export const useGameLogic = () => {
       const timeDiff = now - prev.pet.lastUpdated;
       const minutesPassed = timeDiff / (1000 * 60);
 
-      if (minutesPassed < 0.5) return prev; // Optimization: don't update if less than 30s passed
+      if (minutesPassed < 0.5) return prev; // Optimization
 
-      const decayAmount = minutesPassed * CONSTANTS.DECAY_RATE_PER_MINUTE;
+      // Apply User Settings Multiplier
+      const multiplier = prev.settings?.hungerRateMultiplier ?? 1.0;
+      const decayAmount = minutesPassed * CONSTANTS.DECAY_RATE_PER_MINUTE * multiplier;
       
       let newFullness = prev.pet.fullness - decayAmount;
       let newSatisfaction = prev.pet.satisfaction - decayAmount;
 
-      // Check for "death" (Hunger/Fullness reaches 0)
+      // Check for "death"
       if (newFullness <= 0) {
         return {
           ...prev,
@@ -57,10 +71,9 @@ export const useGameLogic = () => {
     });
   }, []);
 
-  // Run calculation on mount and interval
   useEffect(() => {
-    processTimePassage(); // Run immediately on load
-    const interval = setInterval(processTimePassage, 10000); // Check every 10s
+    processTimePassage(); 
+    const interval = setInterval(processTimePassage, 10000); 
     return () => clearInterval(interval);
   }, [processTimePassage]);
 
@@ -87,8 +100,10 @@ export const useGameLogic = () => {
     }
 
     setGameState(prev => {
-      const newFullness = Math.min(CONSTANTS.MAX_STAT, prev.pet.fullness + CONSTANTS.SNACK_RECOVERY_FULLNESS);
-      const newSatisfaction = Math.min(CONSTANTS.MAX_STAT, prev.pet.satisfaction + CONSTANTS.SNACK_RECOVERY_SATISFACTION);
+      const multiplier = prev.settings?.feedingPowerMultiplier ?? 1.0;
+      
+      const newFullness = Math.min(CONSTANTS.MAX_STAT, prev.pet.fullness + (CONSTANTS.SNACK_RECOVERY_FULLNESS * multiplier));
+      const newSatisfaction = Math.min(CONSTANTS.MAX_STAT, prev.pet.satisfaction + (CONSTANTS.SNACK_RECOVERY_SATISFACTION * multiplier));
       
       const isMaxSatisfaction = newSatisfaction >= CONSTANTS.MAX_STAT && prev.pet.satisfaction < CONSTANTS.MAX_STAT;
 
@@ -109,6 +124,23 @@ export const useGameLogic = () => {
     });
   };
 
+  const petCharacter = () => {
+    if (gameState.pet.isDead) return;
+    
+    // Random cute message
+    const msg = CUTE_MESSAGES[Math.floor(Math.random() * CUTE_MESSAGES.length)];
+    setFeedbackMessage(msg);
+
+    // Small satisfaction boost for petting
+    setGameState(prev => ({
+      ...prev,
+      pet: {
+        ...prev.pet,
+        satisfaction: Math.min(CONSTANTS.MAX_STAT, prev.pet.satisfaction + 2),
+      }
+    }));
+  };
+
   const addSnacks = (amount: number) => {
     setGameState(prev => ({
       ...prev,
@@ -127,9 +159,16 @@ export const useGameLogic = () => {
         isDead: false,
         lastUpdated: Date.now()
       },
-      snacks: Math.max(1, prev.snacks) // Mercy snack
+      snacks: Math.max(1, prev.snacks) 
     }));
     setFeedbackMessage("Your pet is back!");
+  };
+
+  const updateSettings = (newSettings: Partial<GameSettings>) => {
+    setGameState(prev => ({
+      ...prev,
+      settings: { ...prev.settings, ...newSettings }
+    }));
   };
 
   const clearFeedback = () => setFeedbackMessage(null);
@@ -138,8 +177,10 @@ export const useGameLogic = () => {
     gameState,
     uploadImage,
     feedPet,
+    petCharacter,
     addSnacks,
     resetPet,
+    updateSettings,
     feedbackMessage,
     clearFeedback
   };

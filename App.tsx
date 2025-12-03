@@ -1,24 +1,35 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useGameLogic } from './hooks/useGameLogic';
 import { compressImage } from './utils/storage';
 import { ProgressBar } from './components/ProgressBar';
 import { FocusTimer } from './components/FocusTimer';
+import { SettingsPanel } from './components/SettingsPanel';
+import { MusicPlayer } from './components/MusicPlayer';
 import { CONSTANTS } from './types';
-import { Heart, Utensils, Timer, Upload, Trophy, AlertCircle, X } from './components/Icons';
+import { Heart, Utensils, Timer, Upload, Trophy, AlertCircle, X, Settings, Music, Sparkles } from './components/Icons';
 
 function App() {
   const { 
     gameState, 
     uploadImage, 
     feedPet, 
+    petCharacter,
     addSnacks, 
     resetPet, 
+    updateSettings,
     feedbackMessage, 
     clearFeedback 
   } = useGameLogic();
 
   const [isTimerOpen, setIsTimerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMusicOpen, setIsMusicOpen] = useState(false);
+  
   const [showLove, setShowLove] = useState(false);
+  const [isFeeding, setIsFeeding] = useState(false);
+  const [isPetting, setIsPetting] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle Feedback Messages
@@ -28,7 +39,7 @@ function App() {
       const timer = setTimeout(() => setShowLove(false), 3000);
       return () => clearTimeout(timer);
     } else if (feedbackMessage) {
-      const timer = setTimeout(clearFeedback, 3000);
+      const timer = setTimeout(clearFeedback, 2500);
       return () => clearTimeout(timer);
     }
   }, [feedbackMessage, clearFeedback]);
@@ -49,6 +60,22 @@ function App() {
     const snacksEarned = Math.max(1, Math.floor(minutes / 10));
     addSnacks(snacksEarned);
     setIsTimerOpen(false);
+  };
+
+  const handleFeed = () => {
+    if (gameState.snacks > 0) {
+      setIsFeeding(true);
+      setTimeout(() => setIsFeeding(false), 1000);
+      feedPet();
+    } else {
+      feedPet(); // Triggers "No snacks" message
+    }
+  };
+
+  const handlePetInteraction = () => {
+    setIsPetting(true);
+    petCharacter();
+    setTimeout(() => setIsPetting(false), 500);
   };
 
   // --- RENDERING ---
@@ -118,9 +145,17 @@ function App() {
   return (
     <div className="min-h-screen bg-brand-50 flex flex-col relative max-w-md mx-auto shadow-2xl overflow-hidden">
       
-      {/* Top Bar: Inventory */}
+      {/* Top Bar: Utils & Inventory */}
       <header className="px-6 py-4 flex justify-between items-center z-10">
-        <h1 className="font-bold text-gray-700">{gameState.pet.name}</h1>
+        <div className="flex gap-2">
+           <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-white/80 rounded-full shadow-sm text-gray-600 active:scale-95">
+             <Settings size={20} />
+           </button>
+           <button onClick={() => setIsMusicOpen(true)} className="p-2 bg-white/80 rounded-full shadow-sm text-gray-600 active:scale-95">
+             <Music size={20} />
+           </button>
+        </div>
+        
         <div className="bg-white px-3 py-1.5 rounded-full shadow-sm flex items-center gap-2 border border-brand-100">
           <Utensils size={14} className="text-brand-500" />
           <span className="font-mono font-bold text-gray-800">{gameState.snacks}</span>
@@ -130,6 +165,16 @@ function App() {
       {/* Main Area: Pet Display */}
       <main className="flex-1 flex flex-col items-center justify-center relative p-6">
         
+        {/* Feeding Particles Overlay */}
+        {isFeeding && (
+          <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center">
+             <div className="absolute animate-[ping_0.5s_ease-out]"><Sparkles size={120} className="text-yellow-400" /></div>
+             <div className="absolute -translate-y-20 animate-[bounce_0.5s]"><Heart size={40} fill="#f43f5e" className="text-brand-500" /></div>
+             <div className="absolute translate-x-16 -translate-y-10 animate-[bounce_0.6s]"><Heart size={30} fill="#f43f5e" className="text-brand-400" /></div>
+             <div className="absolute -translate-x-16 -translate-y-10 animate-[bounce_0.7s]"><Heart size={30} fill="#f43f5e" className="text-brand-300" /></div>
+          </div>
+        )}
+
         {/* Floating Hearts Animation Container */}
         {showLove && (
           <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
@@ -139,20 +184,31 @@ function App() {
           </div>
         )}
 
-        {/* Pet Image */}
-        <div className="relative group w-64 h-64 mb-8">
+        {/* Pet Image Container - Clickable for petting */}
+        <div 
+           className="relative group w-64 h-64 mb-8 cursor-pointer select-none touch-manipulation" 
+           onClick={handlePetInteraction}
+        >
            <div className="absolute inset-0 bg-brand-200 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-           <div className={`relative w-full h-full rounded-full border-8 border-white shadow-2xl overflow-hidden transition-transform duration-300 ${showLove ? 'scale-110' : ''}`}>
+           <div 
+             className={`
+                relative w-full h-full rounded-full border-8 border-white shadow-2xl overflow-hidden 
+                transition-all duration-150 ease-out
+                ${showLove ? 'scale-110' : ''}
+                ${isPetting ? 'scale-95 rotate-3' : 'scale-100'}
+                active:scale-95
+             `}
+           >
              <img 
                src={gameState.pet.imageSrc} 
                alt="Pet" 
-               className="w-full h-full object-cover"
+               className="w-full h-full object-cover pointer-events-none"
              />
            </div>
            
            {/* Status Bubble */}
            {gameState.pet.fullness < 30 && (
-             <div className="absolute -top-2 -right-2 bg-white px-3 py-1 rounded-xl shadow-lg border border-red-100 flex items-center gap-1 animate-bounce">
+             <div className="absolute -top-2 -right-2 bg-white px-3 py-1 rounded-xl shadow-lg border border-red-100 flex items-center gap-1 animate-bounce pointer-events-none">
                <AlertCircle size={14} className="text-red-500" />
                <span className="text-xs font-bold text-red-500">Hungry!</span>
              </div>
@@ -182,7 +238,7 @@ function App() {
       <div className="p-6 pb-8 bg-white rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] z-10">
         <div className="grid grid-cols-2 gap-4">
           <button 
-            onClick={feedPet}
+            onClick={handleFeed}
             disabled={gameState.snacks === 0}
             className="flex flex-col items-center justify-center p-4 rounded-2xl bg-brand-50 hover:bg-brand-100 active:bg-brand-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
           >
@@ -208,16 +264,28 @@ function App() {
 
       {/* Toast Notification */}
       {feedbackMessage && !showLove && (
-         <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg animate-in fade-in slide-in-from-top-4">
+         <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-gray-800/90 backdrop-blur text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-xl animate-in fade-in slide-in-from-top-4 z-50 whitespace-nowrap">
            {feedbackMessage}
          </div>
       )}
 
-      {/* Focus Timer Modal */}
+      {/* Modals */}
       <FocusTimer 
         isOpen={isTimerOpen} 
         onClose={() => setIsTimerOpen(false)} 
         onComplete={handleFocusComplete} 
+      />
+
+      <SettingsPanel 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={gameState.settings}
+        onUpdate={updateSettings}
+      />
+
+      <MusicPlayer 
+        isOpen={isMusicOpen}
+        onClose={() => setIsMusicOpen(false)}
       />
     </div>
   );
